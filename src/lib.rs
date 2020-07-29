@@ -1,3 +1,11 @@
+//! Omit parts of a URL for friendlier display.
+//!
+//! This is a Rust port of [shorten-url][].
+//!
+//! See the [shorten][] documentation for usage info.
+//!
+//! [shorten-url]: https://github.com/goto-bus-stop/shorten-url
+//! [shorten]: fn.shorten.html
 use std::borrow::Cow;
 
 fn find_char_start(s: &str, mut index: usize) -> usize {
@@ -8,6 +16,42 @@ fn find_char_start(s: &str, mut index: usize) -> usize {
 }
 
 /// Shorten a URL to `max_len` bytes.
+///
+/// To get to within `max_len` bytes, this function will take out
+/// - Path segments, starting roughly in the middle. Eg.
+///   `/a/b/c/d/e/f` → `/a/…/e/f`
+/// - Query parameters, starting at the end. Eg.
+///   `?a=b&c=d&e=f` → `?a=b&…`
+///
+/// Query parameters are considered less important than path segments, so `/a/…/e/f?…` is preferred
+/// over `/a/…?a=b&…`.
+///
+/// If that is still not enough, the URL is simply truncated.
+///
+/// If the URL is already short enough, it is returned unchanged in a `Cow::Borrowed(_)`.
+///
+/// This function is intended for user display of URLs. It does its own naive, lightweight parsing,
+/// and will produce garbage if the input is not a URL. Detecting URLs in text can be done with a
+/// different crate like [linkify][].
+///
+/// ## Examples
+/// ```rust
+/// use shorten_url::shorten;
+/// assert_eq!(
+///     shorten("https://www.vpro.nl/programmas/gliphoeve/documentaire-intro.html", 50),
+///     "https://www.vpro.nl/…/documentaire-intro.html"
+/// );
+/// assert_eq!(
+///     shorten("http://example.com/ultra/cool/page/that-is-really-deeply/nested/", 30),
+///     "http://example.com/…/nested/"
+/// );
+/// assert_eq!(
+///     shorten("https://www.reddit.com/?count=25&after=t3_76zjp1", 40),
+///     "https://www.reddit.com/?count=25&…"
+/// );
+/// ```
+///
+/// [linkify]: https://lib.rs/crates/linkify
 pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     if input.len() < max_len {
         return input.into();
