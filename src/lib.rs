@@ -13,6 +13,7 @@
 #![warn(unused)]
 #![allow(missing_docs)]
 
+use memchr::{memchr, memrchr};
 use std::borrow::Cow;
 
 fn find_char_start(s: &str, mut index: usize) -> usize {
@@ -71,13 +72,13 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
         ("", input)
     };
 
-    let (host, rest) = if let Some(index) = rest.find('/') {
+    let (host, rest) = if let Some(index) = memchr(b'/', rest.as_bytes()) {
         rest.split_at(index)
     } else {
         (rest, "")
     };
 
-    let (path, query) = if let Some(index) = rest.find('?') {
+    let (path, query) = if let Some(index) = memchr(b'?', rest.as_bytes()) {
         rest.split_at(index)
     } else {
         (rest, "")
@@ -100,12 +101,7 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     let available_len = max_len.saturating_sub(new_len);
     let truncated_query = if query.len() > available_len {
         // We can search for `&` by byte here to avoid utf8 character boundary checks.
-        let trunc_len = if let Some(amp) = query
-            .as_bytes()
-            .iter()
-            .take(available_len)
-            .rposition(|&byte| byte == b'&')
-        {
+        let trunc_len = if let Some(amp) = memrchr(b'&', &query.as_bytes()[0..available_len]) {
             amp + 1
         } else {
             1
