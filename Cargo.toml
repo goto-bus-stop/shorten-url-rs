@@ -8,3 +8,10 @@ edition = "2018"
 
 [dependencies]
 memchr = "2.3.3"
+
+[dev-dependencies]
+criterion = "0.3.3"
+
+[[bench]]
+name = "basic"
+harness = false
