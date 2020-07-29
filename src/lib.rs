@@ -6,6 +6,13 @@
 //!
 //! [shorten-url]: https://github.com/goto-bus-stop/shorten-url
 //! [shorten]: fn.shorten.html
+#![deny(future_incompatible)]
+#![deny(nonstandard_style)]
+#![deny(rust_2018_idioms)]
+#![deny(unsafe_code)]
+#![warn(unused)]
+#![allow(missing_docs)]
+
 use std::borrow::Cow;
 
 fn find_char_start(s: &str, mut index: usize) -> usize {
