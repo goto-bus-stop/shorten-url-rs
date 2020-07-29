@@ -32,14 +32,14 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
         path[1..].split('/').collect::<Vec<_>>()
     };
     let mut path_subst_index = None;
-    while !path_parts.is_empty() && new_len > max_len - 2 {
+    while !path_parts.is_empty() && new_len > max_len {
         let splice_index = (path_parts.len() / 2).saturating_sub(1);
         let removed_part = path_parts.remove(splice_index);
         new_len -= removed_part.len() + 1 /* the / */;
         path_subst_index = Some(splice_index);
     }
 
-    let available_len = (max_len - 2).saturating_sub(new_len);
+    let available_len = max_len.saturating_sub(new_len);
     let truncated_query = if query.len() > available_len {
         let trunc_len = if let Some(amp) = query[0..available_len].rfind('&') {
             amp + 1
@@ -55,7 +55,7 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     if path_subst_index.is_none() && truncated_query.is_none() {
         if input.len() > max_len {
             let mut new_url = String::with_capacity(max_len);
-            new_url.push_str(&input[0..max_len - 1]);
+            new_url.push_str(&input[0..max_len.saturating_sub(1)]);
             new_url.push('…');
             return new_url.into();
         }
