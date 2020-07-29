@@ -11,6 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.3"
+url = "2.1.1"
 
 [dependencies.shorten-url]
 path = ".."
@@ -22,5 +23,11 @@ members = ["."]
 [[bin]]
 name = "basic"
 path = "fuzz_targets/basic.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "url"
+path = "fuzz_targets/url.rs"
 test = false
 doc = false
