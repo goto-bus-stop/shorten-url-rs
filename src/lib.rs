@@ -1,5 +1,12 @@
 use std::borrow::Cow;
 
+fn find_char_start(s: &str, mut index: usize) -> usize {
+    while index > 0 && !s.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
 /// Shorten a URL to `max_len` bytes.
 pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     if input.len() < max_len {
@@ -41,7 +48,13 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
 
     let available_len = max_len.saturating_sub(new_len);
     let truncated_query = if query.len() > available_len {
-        let trunc_len = if let Some(amp) = query[0..available_len].rfind('&') {
+        // We can search for `&` by byte here to avoid utf8 character boundary checks.
+        let trunc_len = if let Some(amp) = query
+            .as_bytes()
+            .iter()
+            .take(available_len)
+            .rposition(|&byte| byte == b'&')
+        {
             amp + 1
         } else {
             1
@@ -55,7 +68,8 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     if path_subst_index.is_none() && truncated_query.is_none() {
         if input.len() > max_len {
             let mut new_url = String::with_capacity(max_len);
-            new_url.push_str(&input[0..max_len.saturating_sub(1)]);
+            let trunc_index = find_char_start(input, max_len.saturating_sub(1));
+            new_url.push_str(&input[0..trunc_index]);
             new_url.push('…');
             return new_url.into();
         }
@@ -138,5 +152,11 @@ mod tests {
             shorten("https://www.thisisasuperlonghostname.co.uk", 35),
             "https://www.thisisasuperlonghostna…"
         );
+    }
+
+    #[test]
+    fn fuzz_char_boundary() {
+        shorten("::::::::::::::::::::::::::::::::::::::::::::::::::::::::ƽ:::::::::::::::!:::::::::::::::::::::::::::::::::::::::::::::::::::::\u{0}:\u{6}::::::::::::", 58);
+        shorten("::::/::::::::::::2::::::::::::::::?:ƽ:%%*", 37);
     }
 }
