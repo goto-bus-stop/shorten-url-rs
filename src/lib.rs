@@ -170,13 +170,8 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
 
     let available_len = max_len.saturating_sub(new_len);
     let truncated_query = if query.len() > available_len {
-        // We can search for `&` by byte here to avoid utf8 character boundary checks.
-        let trunc_len = if let Some(amp) = query
-            .as_bytes()
-            .iter()
-            .take(available_len)
-            .rposition(|&byte| byte == b'&')
-        {
+        let index = find_char_start(query, available_len);
+        let trunc_len = if let Some(amp) = query[..index].rfind('&') {
             amp + 1
         } else {
             1
