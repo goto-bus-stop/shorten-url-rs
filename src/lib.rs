@@ -74,6 +74,42 @@ fn shorten_path(path: &str, max_len: usize) -> Option<ShortenedPath> {
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+struct UrlParts<'s> {
+    scheme: &'s str,
+    host: &'s str,
+    path: &'s str,
+    query: &'s str,
+}
+
+fn extract_parts(input: &str) -> UrlParts<'_> {
+    let rest = input;
+    let (scheme, rest) = if let Some(index) = rest.find("://") {
+        input.split_at(index + "://".len())
+    } else {
+        ("", input)
+    };
+
+    let (host, rest) = if let Some(index) = rest.find('/') {
+        rest.split_at(index)
+    } else {
+        (rest, "")
+    };
+
+    let (path, query) = if let Some(index) = rest.find('?') {
+        rest.split_at(index)
+    } else {
+        (rest, "")
+    };
+
+    UrlParts {
+        scheme,
+        host,
+        path,
+        query,
+    }
+}
+
 /// Shorten a URL to `max_len` bytes.
 ///
 /// To get to within `max_len` bytes, this function will take out
@@ -116,24 +152,12 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
         return input.into();
     }
 
-    let rest = input;
-    let (scheme, rest) = if let Some(index) = rest.find("://") {
-        input.split_at(index + "://".len())
-    } else {
-        ("", input)
-    };
-
-    let (host, rest) = if let Some(index) = rest.find('/') {
-        rest.split_at(index)
-    } else {
-        (rest, "")
-    };
-
-    let (path, query) = if let Some(index) = rest.find('?') {
-        rest.split_at(index)
-    } else {
-        (rest, "")
-    };
+    let UrlParts {
+        scheme,
+        host,
+        path,
+        query,
+    } = extract_parts(input);
 
     let mut new_len = scheme.len() + host.len();
 
