@@ -1,17 +1,15 @@
 [package]
 name = "shorten-url"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Renée Kooi <renee@kooi.me>"]
 edition = "2018"
 description = "omit parts of a url for friendlier display"
-repository = "goto-bus-stop/shorten-url-rs"
-homepage = "https://github.com/goto-bus-stop/shorten-url-rs"
+repository = "https://github.com/goto-bus-stop/shorten-url-rs"
+documentation = "https://docs.rs/shorten-url"
 keywords = ["display", "shorten", "truncate", "url"]
 categories = ["value-formatting"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 
