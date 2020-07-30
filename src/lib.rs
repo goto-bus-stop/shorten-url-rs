@@ -22,6 +22,58 @@ fn find_char_start(s: &str, mut index: usize) -> usize {
     index
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ShortenedPath {
+    len: usize,
+    start_count: usize,
+    end_count: usize,
+}
+
+fn shorten_path(path: &str, max_len: usize) -> Option<ShortenedPath> {
+    let num_parts = path.split('/').count();
+    let mut len = 0;
+    let mut forward_parts = path.split('/').take(num_parts / 2);
+    let mut backward_parts = path
+        .rsplit('/')
+        .take(num_parts / 2 + num_parts % 2)
+        .peekable();
+    let mut start_count = 0;
+    let mut end_count = num_parts;
+    let mut go_backward = false;
+
+    // Trailing slash should not count as its own path part.
+    if let Some(&"") = backward_parts.peek() {
+        let _ = backward_parts.next();
+        end_count -= 1;
+        len += 1;
+    }
+
+    loop {
+        let part = match go_backward {
+            true => backward_parts.next(),
+            false => forward_parts.next(),
+        };
+        match part {
+            Some(part) if len + 1 + part.len() < max_len => {
+                if go_backward {
+                    end_count -= 1;
+                } else {
+                    start_count += 1;
+                }
+                len += 1 + part.len();
+            }
+            Some(_) | None => break,
+        }
+        go_backward = !go_backward;
+    }
+
+    Some(ShortenedPath {
+        len,
+        start_count,
+        end_count,
+    })
+}
+
 /// Shorten a URL to `max_len` bytes.
 ///
 /// To get to within `max_len` bytes, this function will take out
@@ -85,45 +137,12 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
 
     let mut new_len = scheme.len() + host.len();
 
-    let num_path_parts = path.split('/').count();
-    let mut forward_parts = path.split('/').take(num_path_parts / 2);
-    let mut backward_parts = path
-        .rsplit('/')
-        .take(num_path_parts / 2 + num_path_parts % 2)
-        .peekable();
-    let mut forward_count = 0;
-    let mut backward_count = 0;
-    let mut go_backward = false;
+    let shortened_path = shorten_path(path, max_len - new_len);
 
-    // Trailing slash should not count as its own path part.
-    if let Some(&"") = backward_parts.peek() {
-        let _ = backward_parts.next();
-        backward_count += 1;
-        new_len += 1;
-    }
-
-    loop {
-        let part = match go_backward {
-            true => {
-                backward_parts.next()
-            }
-            false => {
-                forward_parts.next()
-            }
-        };
-        match part {
-            Some(part) if new_len + 1 + part.len() < max_len => {
-                if go_backward {
-                    backward_count += 1;
-                } else {
-                    forward_count += 1;
-                }
-                new_len += 1 + part.len();
-            }
-            Some(_) | None => break,
-        }
-        go_backward = !go_backward;
-    }
+    new_len += match shortened_path {
+        Some(ShortenedPath { len, .. }) => len,
+        None => path.len(),
+    };
 
     let available_len = max_len.saturating_sub(new_len);
     let truncated_query = if query.len() > available_len {
@@ -144,7 +163,7 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     };
 
     // If we didn't modify anything, return the original
-    if num_path_parts == forward_count + backward_count && truncated_query.is_none() {
+    if shortened_path.is_none() && truncated_query.is_none() {
         if input.len() > max_len {
             let mut new_url = String::with_capacity(max_len);
             let trunc_index = find_char_start(input, max_len.saturating_sub(1));
@@ -156,28 +175,25 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
         return input.into();
     }
 
-    /*
-    if let Some(index) = path_subst_index {
-        path_parts.insert(index, "…");
-    }
-    */
-
     let mut new_url = String::with_capacity(max_len);
 
     new_url.push_str(scheme);
     new_url.push_str(host);
-    if num_path_parts != forward_count + backward_count {
+    if let Some(ShortenedPath {
+        start_count,
+        end_count,
+        ..
+    }) = shortened_path
+    {
         let mut path_parts = path.split('/');
+        path_parts.by_ref().take(start_count).for_each(|part| {
+            new_url.push_str(part);
+            new_url.push('/');
+        });
+        new_url.push('…');
         path_parts
             .by_ref()
-            .take(forward_count)
-            .for_each(|part| {
-                new_url.push_str(part);
-                new_url.push('/');
-            });
-        new_url.push('…');
-        path_parts.by_ref()
-            .skip(num_path_parts - backward_count - forward_count)
+            .skip(end_count - start_count)
             .for_each(|part| {
                 new_url.push('/');
                 new_url.push_str(part);
