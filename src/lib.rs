@@ -83,18 +83,46 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
         (rest, "")
     };
 
-    let mut new_len = scheme.len() + host.len() + path.len();
-    let mut path_parts = if path.is_empty() {
-        vec![]
-    } else {
-        path[1..].split('/').collect::<Vec<_>>()
-    };
-    let mut path_subst_index = None;
-    while !path_parts.is_empty() && new_len > max_len {
-        let splice_index = (path_parts.len() / 2).saturating_sub(1);
-        let removed_part = path_parts.remove(splice_index);
-        new_len -= removed_part.len() + 1 /* the / */;
-        path_subst_index = Some(splice_index);
+    let mut new_len = scheme.len() + host.len();
+
+    let num_path_parts = path.split('/').count();
+    let mut forward_parts = path.split('/').take(num_path_parts / 2);
+    let mut backward_parts = path
+        .rsplit('/')
+        .take(num_path_parts / 2 + num_path_parts % 2)
+        .peekable();
+    let mut forward_count = 0;
+    let mut backward_count = 0;
+    let mut go_backward = false;
+
+    // Trailing slash should not count as its own path part.
+    if let Some(&"") = backward_parts.peek() {
+        let _ = backward_parts.next();
+        backward_count += 1;
+        new_len += 1;
+    }
+
+    loop {
+        let part = match go_backward {
+            true => {
+                backward_parts.next()
+            }
+            false => {
+                forward_parts.next()
+            }
+        };
+        match part {
+            Some(part) if new_len + 1 + part.len() < max_len => {
+                if go_backward {
+                    backward_count += 1;
+                } else {
+                    forward_count += 1;
+                }
+                new_len += 1 + part.len();
+            }
+            Some(_) | None => break,
+        }
+        go_backward = !go_backward;
     }
 
     let available_len = max_len.saturating_sub(new_len);
@@ -116,7 +144,7 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
     };
 
     // If we didn't modify anything, return the original
-    if path_subst_index.is_none() && truncated_query.is_none() {
+    if num_path_parts == forward_count + backward_count && truncated_query.is_none() {
         if input.len() > max_len {
             let mut new_url = String::with_capacity(max_len);
             let trunc_index = find_char_start(input, max_len.saturating_sub(1));
@@ -128,17 +156,34 @@ pub fn shorten(input: &str, max_len: usize) -> Cow<'_, str> {
         return input.into();
     }
 
+    /*
     if let Some(index) = path_subst_index {
         path_parts.insert(index, "…");
     }
+    */
 
     let mut new_url = String::with_capacity(max_len);
 
     new_url.push_str(scheme);
     new_url.push_str(host);
-    for part in path_parts {
-        new_url.push('/');
-        new_url.push_str(part);
+    if num_path_parts != forward_count + backward_count {
+        let mut path_parts = path.split('/');
+        path_parts
+            .by_ref()
+            .take(forward_count)
+            .for_each(|part| {
+                new_url.push_str(part);
+                new_url.push('/');
+            });
+        new_url.push('…');
+        path_parts.by_ref()
+            .skip(num_path_parts - backward_count - forward_count)
+            .for_each(|part| {
+                new_url.push('/');
+                new_url.push_str(part);
+            });
+    } else {
+        new_url.push_str(path);
     }
     match truncated_query {
         Some(truncated) => {
